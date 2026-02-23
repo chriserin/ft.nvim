@@ -1,0 +1,159 @@
+describe("ft.parse", function()
+  local parse
+
+  before_each(function()
+    parse = require("ft.parse")
+  end)
+
+  after_each(function()
+    package.loaded["ft.parse"] = nil
+  end)
+
+  describe("find_ft_tags", function()
+    it("finds tags at various positions", function()
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+        "Feature: Login",
+        "",
+        "  @ft:1",
+        "  Scenario: User logs in",
+        "    Given a user",
+        "",
+        "  @ft:12",
+        "  Scenario: User logs out",
+      })
+      local tags = parse.find_ft_tags(buf)
+      assert.equals(1, tags[2])
+      assert.equals(12, tags[6])
+      assert.is_nil(tags[0])
+      assert.is_nil(tags[3])
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+
+    it("returns empty table for buffer with no tags", function()
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+        "Feature: Login",
+        "  Scenario: User logs in",
+        "    Given a user",
+      })
+      local tags = parse.find_ft_tags(buf)
+      assert.same({}, tags)
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+
+    it("ignores lines where @ft tag is not alone on the line", function()
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+        "  @ft:1",
+        "  @ft:2 extra text",
+        "text @ft:3",
+        "  @ft:4",
+      })
+      local tags = parse.find_ft_tags(buf)
+      assert.equals(1, tags[0])
+      assert.is_nil(tags[1])
+      assert.is_nil(tags[2])
+      assert.equals(4, tags[3])
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+  end)
+
+  describe("find_scenario_at_cursor", function()
+    local buf
+
+    before_each(function()
+      buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+        "Feature: Login",          -- 1
+        "",                         -- 2
+        "  @ft:1",                  -- 3
+        "  Scenario: User logs in", -- 4
+        "    Given a user",         -- 5
+        "    When they log in",     -- 6
+        "",                         -- 7
+        "  @ft:2",                  -- 8
+        "  Scenario: User logs out",-- 9
+        "    Given a logged in user",-- 10
+      })
+      vim.api.nvim_set_current_buf(buf)
+    end)
+
+    after_each(function()
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+
+    it("finds tag above cursor", function()
+      vim.api.nvim_win_set_cursor(0, { 5, 0 })
+      local id = parse.find_scenario_at_cursor(buf)
+      assert.equals(1, id)
+    end)
+
+    it("finds nearest tag when cursor is in second scenario", function()
+      vim.api.nvim_win_set_cursor(0, { 10, 0 })
+      local id = parse.find_scenario_at_cursor(buf)
+      assert.equals(2, id)
+    end)
+
+    it("stops at Feature: line", function()
+      vim.api.nvim_win_set_cursor(0, { 2, 0 })
+      local id = parse.find_scenario_at_cursor(buf)
+      assert.is_nil(id)
+    end)
+
+    it("returns nil when no tag found", function()
+      local empty_buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(empty_buf, 0, -1, false, {
+        "Some random text",
+        "More text",
+      })
+      vim.api.nvim_set_current_buf(empty_buf)
+      vim.api.nvim_win_set_cursor(0, { 2, 0 })
+      local id = parse.find_scenario_at_cursor(empty_buf)
+      assert.is_nil(id)
+      vim.api.nvim_buf_delete(empty_buf, { force = true })
+    end)
+  end)
+
+  describe("parse_list_output", function()
+    it("parses single row", function()
+      local output = "@ft:1   login.ft      User logs in           accepted\n"
+      local results = parse.parse_list_output(output)
+      assert.equals(1, #results)
+      assert.equals(1, results[1].id)
+      assert.equals("fts/login.ft", results[1].file)
+      assert.equals("User logs in", results[1].name)
+      assert.equals("accepted", results[1].status)
+    end)
+
+    it("parses multiple rows with varying column widths", function()
+      local output = table.concat({
+        "@ft:1   login.ft      User logs in           accepted",
+        "@ft:12  checkout.ft   User completes order   in-progress",
+        "@ft:3   login.ft      User logs out          no-activity",
+      }, "\n")
+      local results = parse.parse_list_output(output)
+      assert.equals(3, #results)
+      assert.equals(1, results[1].id)
+      assert.equals(12, results[2].id)
+      assert.equals("fts/checkout.ft", results[2].file)
+      assert.equals("User completes order", results[2].name)
+      assert.equals("in-progress", results[2].status)
+      assert.equals(3, results[3].id)
+      assert.equals("no-activity", results[3].status)
+    end)
+
+    it("returns empty table for empty string", function()
+      local results = parse.parse_list_output("")
+      assert.same({}, results)
+    end)
+
+    it("handles multi-word scenario names", function()
+      local output = "@ft:7   checkout.ft   User logs payment details   in-progress\n"
+      local results = parse.parse_list_output(output)
+      assert.equals(1, #results)
+      assert.equals("User logs payment details", results[1].name)
+      assert.equals("in-progress", results[1].status)
+    end)
+  end)
+end)
