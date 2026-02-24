@@ -113,6 +113,30 @@ describe("ft.parse", function()
       assert.is_nil(id)
       vim.api.nvim_buf_delete(empty_buf, { force = true })
     end)
+
+    it("returns correct id when cursor is on an @ft tag line", function()
+      vim.api.nvim_win_set_cursor(0, { 8, 0 })
+      local id = parse.find_scenario_at_cursor(buf)
+      assert.equals(2, id)
+    end)
+
+    it("returns nil for untagged scenario below a tagged one", function()
+      local buf2 = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf2, 0, -1, false, {
+        "Feature: Login",              -- 1
+        "  @ft:1",                      -- 2
+        "  Scenario: User logs in",     -- 3
+        "    Given a user",             -- 4
+        "",                             -- 5
+        "  Scenario: User signs up",    -- 6 (no @ft tag)
+        "    Given a new user",         -- 7
+      })
+      vim.api.nvim_set_current_buf(buf2)
+      vim.api.nvim_win_set_cursor(0, { 7, 0 })
+      local id = parse.find_scenario_at_cursor(buf2)
+      assert.is_nil(id)
+      vim.api.nvim_buf_delete(buf2, { force = true })
+    end)
   end)
 
   describe("parse_list_output", function()
@@ -154,6 +178,65 @@ describe("ft.parse", function()
       assert.equals(1, #results)
       assert.equals("User logs payment details", results[1].name)
       assert.equals("in-progress", results[1].status)
+    end)
+  end)
+
+  describe("filter_by_status", function()
+    local scenarios = {
+      { id = 1, file = "fts/login.ft", name = "User logs in", status = "accepted" },
+      { id = 2, file = "fts/login.ft", name = "User logs out", status = "in-progress" },
+      { id = 3, file = "fts/checkout.ft", name = "User checks out", status = "accepted" },
+    }
+
+    it("filters by exact status match", function()
+      local result = parse.filter_by_status(scenarios, "accepted")
+      assert.equals(2, #result)
+      assert.equals(1, result[1].id)
+      assert.equals(3, result[2].id)
+    end)
+
+    it("filters by negated status", function()
+      local result = parse.filter_by_status(scenarios, "!accepted")
+      assert.equals(1, #result)
+      assert.equals(2, result[1].id)
+      assert.equals("in-progress", result[1].status)
+    end)
+
+    it("returns empty table when no scenarios match", function()
+      local result = parse.filter_by_status(scenarios, "done")
+      assert.same({}, result)
+    end)
+
+    it("returns empty table when negation excludes all", function()
+      local all_accepted = {
+        { id = 1, file = "a.ft", name = "A", status = "accepted" },
+        { id = 2, file = "b.ft", name = "B", status = "accepted" },
+      }
+      local result = parse.filter_by_status(all_accepted, "!accepted")
+      assert.same({}, result)
+    end)
+
+    it("excludes removed scenarios", function()
+      local with_removed = {
+        { id = 1, file = "fts/login.ft", name = "User logs in", status = "accepted" },
+        { id = 2, file = "fts/login.ft", name = "User signs up", status = "removed" },
+        { id = 3, file = "fts/checkout.ft", name = "User checks out", status = "accepted" },
+      }
+      local result = parse.filter_by_status(with_removed, "accepted")
+      assert.equals(2, #result)
+      assert.equals(1, result[1].id)
+      assert.equals(3, result[2].id)
+    end)
+
+    it("excludes removed scenarios even with negation", function()
+      local with_removed = {
+        { id = 1, file = "a.ft", name = "A", status = "accepted" },
+        { id = 2, file = "b.ft", name = "B", status = "removed" },
+        { id = 3, file = "c.ft", name = "C", status = "in-progress" },
+      }
+      local result = parse.filter_by_status(with_removed, "!accepted")
+      assert.equals(1, #result)
+      assert.equals(3, result[1].id)
     end)
   end)
 end)

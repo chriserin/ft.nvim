@@ -8,6 +8,7 @@ function M.setup(opts)
 
   vim.api.nvim_create_user_command("FtSync", function()
     local bufnr = vim.api.nvim_get_current_buf()
+    local view = vim.fn.winsaveview()
     local cli = require("ft.cli")
     local cwd = cli.find_root_for_buffer(bufnr)
     if not cwd then
@@ -25,6 +26,7 @@ function M.setup(opts)
       if bufname:match("%.ft$") then
         vim.api.nvim_buf_call(bufnr, function()
           vim.cmd("edit")
+          vim.fn.winrestview(view)
         end)
         require("ft.virtual_text").refresh(bufnr)
       end
@@ -32,37 +34,43 @@ function M.setup(opts)
   end, { desc = "Run ft sync" })
 
   vim.api.nvim_create_user_command("FtList", function()
-    require("ft.telescope").pick()
+    require("ft.picker").pick()
   end, { desc = "List scenarios" })
 
   vim.api.nvim_create_user_command("FtStatus", function(cmd_opts)
-    local args = vim.split(cmd_opts.args, " ", { trimempty = true })
-    if #args < 2 then
-      vim.notify("Usage: :FtStatus <id> <status>", vim.log.levels.ERROR)
+    local status_filter = vim.trim(cmd_opts.args)
+    if status_filter == "" then
+      vim.notify("Usage: :FtStatus <status>", vim.log.levels.ERROR)
       return
     end
-    local bufnr = vim.api.nvim_get_current_buf()
     local cli = require("ft.cli")
-    local cwd = cli.find_root_for_buffer(bufnr)
+    local cwd = cli.find_root_for_buffer(0)
     if not cwd then
       vim.notify("Not in an ft project", vim.log.levels.ERROR)
       return
     end
-    local id = args[1]
-    local status_name = table.concat(vim.list_slice(args, 2), " ")
-    cli.set_status(cwd, id, status_name, function(err, output)
+    cli.list(cwd, function(err, scenarios)
       if err then
         vim.notify(err, vim.log.levels.ERROR)
         return
       end
-      vim.notify(vim.trim(output), vim.log.levels.INFO)
-      if not vim.api.nvim_buf_is_valid(bufnr) then return end
-      local bufname = vim.api.nvim_buf_get_name(bufnr)
-      if bufname:match("%.ft$") then
-        require("ft.virtual_text").refresh(bufnr)
+      local matched = require("ft.parse").filter_by_status(scenarios, status_filter)
+      local entries = {}
+      for _, s in ipairs(matched) do
+        table.insert(entries, {
+          filename = s.file,
+          pattern = "\\m@ft:" .. s.id,
+          text = s.name .. "  " .. s.status,
+        })
       end
+      if #entries == 0 then
+        vim.notify("No scenarios match \"" .. status_filter .. "\"", vim.log.levels.INFO)
+        return
+      end
+      vim.fn.setqflist(entries, "r")
+      vim.cmd("copen")
     end)
-  end, { nargs = "+", desc = "Set scenario status" })
+  end, { nargs = "?", desc = "List scenarios by status in quickfix" })
 
   require("ft.autocmds").setup()
 end

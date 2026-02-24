@@ -24,12 +24,6 @@ function M.check()
     vim.health.warn("`fts/ft.db` not found — run `ft init`")
   end
 
-  local ok, _ = pcall(require, "telescope")
-  if ok then
-    vim.health.ok("telescope.nvim available")
-  else
-    vim.health.info("telescope.nvim not installed — :FtList will use vim.ui.select")
-  end
 end
 
 return M
