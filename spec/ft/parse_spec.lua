@@ -181,62 +181,37 @@ describe("ft.parse", function()
     end)
   end)
 
-  describe("filter_by_status", function()
-    local scenarios = {
-      { id = 1, file = "fts/login.ft", name = "User logs in", status = "accepted" },
-      { id = 2, file = "fts/login.ft", name = "User logs out", status = "in-progress" },
-      { id = 3, file = "fts/checkout.ft", name = "User checks out", status = "accepted" },
-    }
-
-    it("filters by exact status match", function()
-      local result = parse.filter_by_status(scenarios, "accepted")
-      assert.equals(2, #result)
-      assert.equals(1, result[1].id)
-      assert.equals(3, result[2].id)
-    end)
-
-    it("filters by negated status", function()
-      local result = parse.filter_by_status(scenarios, "!accepted")
-      assert.equals(1, #result)
-      assert.equals(2, result[1].id)
-      assert.equals("in-progress", result[1].status)
-    end)
-
-    it("returns empty table when no scenarios match", function()
-      local result = parse.filter_by_status(scenarios, "done")
-      assert.same({}, result)
-    end)
-
-    it("returns empty table when negation excludes all", function()
-      local all_accepted = {
-        { id = 1, file = "a.ft", name = "A", status = "accepted" },
-        { id = 2, file = "b.ft", name = "B", status = "accepted" },
+  describe("scenarios_to_qf_entries", function()
+    it("builds quickfix entries from scenarios", function()
+      local scenarios = {
+        { id = 1, file = "fts/login.ft", name = "User logs in", status = "accepted" },
+        { id = 2, file = "fts/checkout.ft", name = "User checks out", status = "ready" },
       }
-      local result = parse.filter_by_status(all_accepted, "!accepted")
-      assert.same({}, result)
+      local entries = parse.scenarios_to_qf_entries(scenarios)
+      assert.equals(2, #entries)
+      assert.equals("fts/login.ft", entries[1].filename)
+      assert.equals("\\m@ft:1", entries[1].pattern)
+      assert.equals("User logs in  accepted", entries[1].text)
     end)
 
     it("excludes removed scenarios", function()
-      local with_removed = {
+      local scenarios = {
         { id = 1, file = "fts/login.ft", name = "User logs in", status = "accepted" },
         { id = 2, file = "fts/login.ft", name = "User signs up", status = "removed" },
         { id = 3, file = "fts/checkout.ft", name = "User checks out", status = "accepted" },
       }
-      local result = parse.filter_by_status(with_removed, "accepted")
-      assert.equals(2, #result)
-      assert.equals(1, result[1].id)
-      assert.equals(3, result[2].id)
+      local entries = parse.scenarios_to_qf_entries(scenarios)
+      assert.equals(2, #entries)
+      assert.equals("1", entries[1].pattern:match("@ft:(%d+)"))
+      assert.equals("3", entries[2].pattern:match("@ft:(%d+)"))
     end)
 
-    it("excludes removed scenarios even with negation", function()
-      local with_removed = {
-        { id = 1, file = "a.ft", name = "A", status = "accepted" },
-        { id = 2, file = "b.ft", name = "B", status = "removed" },
-        { id = 3, file = "c.ft", name = "C", status = "in-progress" },
+    it("returns empty table when all scenarios are removed", function()
+      local scenarios = {
+        { id = 1, file = "fts/login.ft", name = "User logs in", status = "removed" },
       }
-      local result = parse.filter_by_status(with_removed, "!accepted")
-      assert.equals(1, #result)
-      assert.equals(3, result[1].id)
+      local entries = parse.scenarios_to_qf_entries(scenarios)
+      assert.same({}, entries)
     end)
   end)
 end)

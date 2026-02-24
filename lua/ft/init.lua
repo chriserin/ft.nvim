@@ -33,14 +33,14 @@ function M.setup(opts)
     end)
   end, { desc = "Run ft sync" })
 
-  vim.api.nvim_create_user_command("FtList", function()
+  vim.api.nvim_create_user_command("FtFind", function()
     require("ft.picker").pick()
-  end, { desc = "List scenarios" })
+  end, { desc = "Find scenarios" })
 
-  vim.api.nvim_create_user_command("FtStatus", function(cmd_opts)
-    local status_filter = vim.trim(cmd_opts.args)
-    if status_filter == "" then
-      vim.notify("Usage: :FtStatus <status>", vim.log.levels.ERROR)
+  vim.api.nvim_create_user_command("FtList", function(cmd_opts)
+    local filters = cmd_opts.fargs
+    if #filters == 0 then
+      vim.notify("Usage: :FtList <status...>", vim.log.levels.ERROR)
       return
     end
     local cli = require("ft.cli")
@@ -49,28 +49,20 @@ function M.setup(opts)
       vim.notify("Not in an ft project", vim.log.levels.ERROR)
       return
     end
-    cli.list(cwd, function(err, scenarios)
+    cli.list(cwd, filters, function(err, scenarios)
       if err then
         vim.notify(err, vim.log.levels.ERROR)
         return
       end
-      local matched = require("ft.parse").filter_by_status(scenarios, status_filter)
-      local entries = {}
-      for _, s in ipairs(matched) do
-        table.insert(entries, {
-          filename = s.file,
-          pattern = "\\m@ft:" .. s.id,
-          text = s.name .. "  " .. s.status,
-        })
-      end
+      local entries = require("ft.parse").scenarios_to_qf_entries(scenarios)
       if #entries == 0 then
-        vim.notify("No scenarios match \"" .. status_filter .. "\"", vim.log.levels.INFO)
+        vim.notify("No scenarios match \"" .. table.concat(filters, " ") .. "\"", vim.log.levels.INFO)
         return
       end
       vim.fn.setqflist(entries, "r")
       vim.cmd("copen")
     end)
-  end, { nargs = "?", desc = "List scenarios by status in quickfix" })
+  end, { nargs = "*", desc = "List scenarios by status in quickfix" })
 
   require("ft.autocmds").setup()
 end

@@ -68,7 +68,7 @@ function M.setup()
 
 	if cfg.keymaps.enabled then
 		for key, action in pairs(cfg.keymaps.mappings) do
-			if action == "list" then
+			if action == "find" then
 				vim.keymap.set("n", key, function()
 					require("ft.picker").pick()
 				end, { desc = "ft: list scenarios" })
@@ -80,7 +80,7 @@ function M.setup()
 			pattern = "ft",
 			callback = function(args)
 				for key, action in pairs(cfg.keymaps.mappings) do
-					if action ~= "list" then
+					if action ~= "find" then
 						vim.keymap.set("n", key, function()
 							require("ft.status").set_status_under_cursor(action)
 						end, { buffer = args.buf, desc = "ft: " .. action })

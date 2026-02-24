@@ -60,20 +60,18 @@ function M.parse_list_output(stdout)
   return results
 end
 
-function M.filter_by_status(scenarios, status_filter)
-  local negate = status_filter:sub(1, 1) == "!"
-  local match_status = negate and status_filter:sub(2) or status_filter
-  local filtered = {}
+function M.scenarios_to_qf_entries(scenarios)
+  local entries = {}
   for _, s in ipairs(scenarios) do
-    if s.status == "removed" then goto continue end
-    local matches = s.status == match_status
-    if negate then matches = not matches end
-    if matches then
-      table.insert(filtered, s)
+    if s.status ~= "removed" then
+      table.insert(entries, {
+        filename = s.file,
+        pattern = "\\m@ft:" .. s.id,
+        text = s.name .. "  " .. s.status,
+      })
     end
-    ::continue::
   end
-  return filtered
+  return entries
 end
 
 return M

@@ -23,7 +23,7 @@ local defaults = {
 			["<leader>tr"] = "ready",
 			["<leader>ta"] = "accepted",
 			["<leader>tj"] = "rejected",
-			["<leader>ff"] = "list",
+			["<leader>ff"] = "find",
 		},
 	},
 

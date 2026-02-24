@@ -42,8 +42,19 @@ function M.sync(cwd, callback)
   run({ "sync" }, cwd, callback)
 end
 
-function M.list(cwd, callback)
-  run({ "list" }, cwd, function(err, stdout)
+function M.list(cwd, filters, callback)
+  local cmd_args = { "list" }
+  if filters then
+    for _, f in ipairs(filters) do
+      if f:sub(1, 1) == "!" then
+        table.insert(cmd_args, "--not")
+        table.insert(cmd_args, f:sub(2))
+      else
+        table.insert(cmd_args, f)
+      end
+    end
+  end
+  run(cmd_args, cwd, function(err, stdout)
     if err then return callback(err, nil) end
     callback(nil, require("ft.parse").parse_list_output(stdout))
   end)

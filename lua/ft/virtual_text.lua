@@ -15,7 +15,7 @@ function M.refresh(bufnr)
   local cwd = cli.find_root_for_buffer(bufnr)
   if not cwd then return end
 
-  cli.list(cwd, function(err, scenarios)
+  cli.list(cwd, nil, function(err, scenarios)
     if err or not scenarios then return end
     if not vim.api.nvim_buf_is_valid(bufnr) then return end
 

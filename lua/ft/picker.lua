@@ -9,7 +9,7 @@ function M.pick()
     return
   end
 
-  cli.list(cwd, function(err, scenarios)
+  cli.list(cwd, nil, function(err, scenarios)
     if err then
       vim.notify(err, vim.log.levels.ERROR)
       return

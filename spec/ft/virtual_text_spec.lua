@@ -32,7 +32,7 @@ describe("ft.virtual_text", function()
   end
 
   local function stub_cli_list(scenarios)
-    cli.list = function(_, callback)
+    cli.list = function(_, _, callback)
       callback(nil, scenarios)
     end
     cli.find_root_for_buffer = function(_)
