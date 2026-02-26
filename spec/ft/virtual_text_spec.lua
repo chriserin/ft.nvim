@@ -31,9 +31,13 @@ describe("ft.virtual_text", function()
     return buf
   end
 
-  local function stub_cli_list(scenarios)
-    cli.list = function(_, _, callback)
-      callback(nil, scenarios)
+  local function stub_cli_list(scenarios, tested_scenarios)
+    cli.list = function(_, filters, callback)
+      if filters and vim.tbl_contains(filters, "tested") then
+        callback(nil, tested_scenarios or {})
+      else
+        callback(nil, scenarios)
+      end
     end
     cli.find_root_for_buffer = function(_)
       return "/tmp/fake-project"
@@ -90,6 +94,66 @@ describe("ft.virtual_text", function()
     local marks = vim.api.nvim_buf_get_extmarks(buf, virtual_text.ns, 0, -1, { details = true })
     assert.equals(1, #marks)
     assert.equals("Comment", marks[1][4].virt_text[1][2])
+
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
+  it("appends tested indicator as second chunk", function()
+    local buf = make_buffer_with_tags()
+    stub_cli_list({
+      { id = 1, file = "login.ft", name = "User logs in", status = "accepted" },
+      { id = 2, file = "login.ft", name = "User logs out", status = "in-progress" },
+    }, {
+      { id = 1, file = "login.ft", name = "User logs in", status = "accepted" },
+    })
+
+    virtual_text.refresh(buf)
+
+    local marks = vim.api.nvim_buf_get_extmarks(buf, virtual_text.ns, 0, -1, { details = true })
+    assert.equals(2, #marks)
+
+    -- @ft:1 is tested — two chunks
+    assert.equals(2, #marks[1][4].virt_text)
+    assert.equals(" accepted", marks[1][4].virt_text[1][1])
+    assert.equals(" tested", marks[1][4].virt_text[2][1])
+
+    -- @ft:2 is not tested — one chunk only
+    assert.equals(1, #marks[2][4].virt_text)
+    assert.equals(" in-progress", marks[2][4].virt_text[1][1])
+
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
+  it("uses DiagnosticHint for tested highlight", function()
+    local buf = make_buffer_with_tags()
+    stub_cli_list({
+      { id = 1, file = "login.ft", name = "User logs in", status = "accepted" },
+    }, {
+      { id = 1, file = "login.ft", name = "User logs in", status = "accepted" },
+    })
+
+    virtual_text.refresh(buf)
+
+    local marks = vim.api.nvim_buf_get_extmarks(buf, virtual_text.ns, 0, -1, { details = true })
+    assert.equals(1, #marks)
+    assert.equals("DiagnosticHint", marks[1][4].virt_text[2][2])
+
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
+  it("non-tested scenarios have single chunk only", function()
+    local buf = make_buffer_with_tags()
+    stub_cli_list({
+      { id = 1, file = "login.ft", name = "User logs in", status = "accepted" },
+      { id = 2, file = "login.ft", name = "User logs out", status = "in-progress" },
+    }, {})
+
+    virtual_text.refresh(buf)
+
+    local marks = vim.api.nvim_buf_get_extmarks(buf, virtual_text.ns, 0, -1, { details = true })
+    assert.equals(2, #marks)
+    assert.equals(1, #marks[1][4].virt_text)
+    assert.equals(1, #marks[2][4].virt_text)
 
     vim.api.nvim_buf_delete(buf, { force = true })
   end)

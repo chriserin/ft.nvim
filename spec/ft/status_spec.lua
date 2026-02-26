@@ -40,6 +40,60 @@ describe("ft.status", function()
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 
+  it("show_history_under_cursor notifies when no tag found", function()
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+      "Feature: Login",
+      "  Some text without tags",
+    })
+    vim.api.nvim_set_current_buf(buf)
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+
+    status.show_history_under_cursor()
+
+    assert.equals(1, #notifications)
+    assert.equals(vim.log.levels.WARN, notifications[1].level)
+    assert.truthy(notifications[1].msg:match("No @ft tag found"))
+
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
+  it("goto_test_under_cursor notifies when no tag found", function()
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+      "Feature: Login",
+      "  Some text without tags",
+    })
+    vim.api.nvim_set_current_buf(buf)
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+
+    status.goto_test_under_cursor()
+
+    assert.equals(1, #notifications)
+    assert.equals(vim.log.levels.WARN, notifications[1].level)
+    assert.truthy(notifications[1].msg:match("No @ft tag found"))
+
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
+  it("goto_scenario_under_cursor notifies when no tag found", function()
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+      "func TestSomething(t *testing.T) {",
+      "  t.Run(\"test\", func(t *testing.T) {",
+    })
+    vim.api.nvim_set_current_buf(buf)
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+
+    status.goto_scenario_under_cursor()
+
+    assert.equals(1, #notifications)
+    assert.equals(vim.log.levels.WARN, notifications[1].level)
+    assert.truthy(notifications[1].msg:match("No @ft tag found"))
+
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
   it("notifies error when not in ft project", function()
     local buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {

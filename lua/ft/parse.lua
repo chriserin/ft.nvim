@@ -60,6 +60,33 @@ function M.parse_list_output(stdout)
   return results
 end
 
+function M.parse_tests_output(stdout)
+  local results = {}
+  for line in stdout:gmatch("[^\n]+") do
+    local file, lnum, name = line:match("^%s*(.+):(%d+)%s+(%S+)%s*$")
+    if not file then
+      file, lnum = line:match("^%s*(.+):(%d+)%s*$")
+    end
+    if file and lnum then
+      table.insert(results, { file = file, lnum = tonumber(lnum), name = name })
+    end
+  end
+  return results
+end
+
+function M.find_ft_tag_near_cursor(bufnr)
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local row = cursor[1]
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local id = lines[row] and lines[row]:match("@ft:(%d+)")
+  if id then return tonumber(id) end
+  if row > 1 then
+    id = lines[row - 1]:match("@ft:(%d+)")
+    if id then return tonumber(id) end
+  end
+  return nil
+end
+
 function M.scenarios_to_qf_entries(scenarios)
   local entries = {}
   for _, s in ipairs(scenarios) do

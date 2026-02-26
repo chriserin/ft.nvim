@@ -64,4 +64,12 @@ function M.set_status(cwd, id, status, callback)
   run({ "status", tostring(id), status }, cwd, callback)
 end
 
+function M.show_history(cwd, id, callback)
+  run({ "show", "--history", tostring(id) }, cwd, callback)
+end
+
+function M.tests(cwd, id, callback)
+  run({ "tests", tostring(id) }, cwd, callback)
+end
+
 return M

@@ -12,8 +12,10 @@ local defaults = {
 			["fulfilled"] = "DiagnosticWarn",
 			["ready"] = "DiagnosticOk",
 			["rejected"] = "DiagnosticError",
+			["modified"] = "DiagnosticInfo",
 		},
 		hl_default = "Comment",
+		tested_hl = "DiagnosticHint",
 		position = "eol",
 	},
 
@@ -24,6 +26,8 @@ local defaults = {
 			["<leader>ta"] = "accepted",
 			["<leader>tj"] = "rejected",
 			["<leader>ff"] = "find",
+			["gt"] = "goto_test",
+			["gT"] = "goto_scenario",
 		},
 	},
 

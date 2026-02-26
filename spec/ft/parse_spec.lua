@@ -181,6 +181,93 @@ describe("ft.parse", function()
     end)
   end)
 
+  describe("parse_tests_output", function()
+    it("parses file:line with function name", function()
+      local output = "  handler_test.go:42 TestHandler\n  service_test.go:100 TestService\n"
+      local results = parse.parse_tests_output(output)
+      assert.equals(2, #results)
+      assert.equals("handler_test.go", results[1].file)
+      assert.equals(42, results[1].lnum)
+      assert.equals("TestHandler", results[1].name)
+      assert.equals("service_test.go", results[2].file)
+      assert.equals(100, results[2].lnum)
+      assert.equals("TestService", results[2].name)
+    end)
+
+    it("parses file:line without function name", function()
+      local output = "  handler_test.go:42\n"
+      local results = parse.parse_tests_output(output)
+      assert.equals(1, #results)
+      assert.equals("handler_test.go", results[1].file)
+      assert.equals(42, results[1].lnum)
+      assert.is_nil(results[1].name)
+    end)
+
+    it("returns empty table for empty string", function()
+      local results = parse.parse_tests_output("")
+      assert.same({}, results)
+    end)
+
+    it("skips lines that do not match file:line format", function()
+      local output = "some header\n  handler_test.go:42\nnot a match\n"
+      local results = parse.parse_tests_output(output)
+      assert.equals(1, #results)
+      assert.equals("handler_test.go", results[1].file)
+    end)
+
+    it("handles paths with directories", function()
+      local output = "  internal/auth/handler_test.go:15\n"
+      local results = parse.parse_tests_output(output)
+      assert.equals(1, #results)
+      assert.equals("internal/auth/handler_test.go", results[1].file)
+      assert.equals(15, results[1].lnum)
+    end)
+  end)
+
+  describe("find_ft_tag_near_cursor", function()
+    it("finds tag on current line", function()
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+        "func TestLogin(t *testing.T) {",
+        "  // @ft:42",
+        "  t.Run(\"test\", func(t *testing.T) {",
+      })
+      vim.api.nvim_set_current_buf(buf)
+      vim.api.nvim_win_set_cursor(0, { 2, 0 })
+      local id = parse.find_ft_tag_near_cursor(buf)
+      assert.equals(42, id)
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+
+    it("finds tag on line above cursor", function()
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+        "// @ft:7",
+        "func TestCheckout(t *testing.T) {",
+        "  t.Run(\"test\", func(t *testing.T) {",
+      })
+      vim.api.nvim_set_current_buf(buf)
+      vim.api.nvim_win_set_cursor(0, { 2, 0 })
+      local id = parse.find_ft_tag_near_cursor(buf)
+      assert.equals(7, id)
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+
+    it("returns nil when no tag nearby", function()
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+        "func TestSomething(t *testing.T) {",
+        "  t.Run(\"test\", func(t *testing.T) {",
+        "    // no tag here",
+      })
+      vim.api.nvim_set_current_buf(buf)
+      vim.api.nvim_win_set_cursor(0, { 2, 0 })
+      local id = parse.find_ft_tag_near_cursor(buf)
+      assert.is_nil(id)
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end)
+  end)
+
   describe("scenarios_to_qf_entries", function()
     it("builds quickfix entries from scenarios", function()
       local scenarios = {
